@@ -5,17 +5,21 @@ ctreePartykit <- list(type = c("Classification", "Regression"),
                       library  = "partykit",
                       loop = NULL)
 
-ctreePartykit$parameters <- data.frame(parameter = c("alpha","minprob"),
-                                       class = c("numeric","numeric"),
-                                       label = c("1 - P-Value Threshold", "min proportion in terminal node"))
+ctreePartykit$parameters <- data.frame(parameter = c("alpha","minprob", "maxdepth"),
+                                       class = c("numeric","numeric", "numeric"),
+                                       label = c("1 - P-Value Threshold", 
+                                                 "min proportion in terminal node",
+                                                 "Max Tree Depth"))
 
 ctreePartykit$grid <- function(x, y, len = NULL, search = "grid") {
   if(search == "grid") {
     out <- data.frame(alpha = seq(from = 0.99, to = 0.01, length = len),
-                      minprob = 0.01)
+                      minprob = 0.01,
+                      maxdepth = Inf)
   } else {
     out <- data.frame(alpha = runif(len, min = 0, max = 1),
-                      minprob = runif(len, min = 0, max = 1))
+                      minprob = runif(len, min = 0, max = 1),
+                      maxdepth = sample(1:15, replace = TRUE, size = len))
   }
 }
 
@@ -25,7 +29,8 @@ ctreePartykit$fit <- function (x, y, wts, param, lev, last, classProbs, ...) {
   theDots <- list(...)
   ctl <- do.call(getFromNamespace("ctree_control", "partykit"),
                  list(alpha = param$alpha,
-                      minprob = param$minprob))
+                      minprob = param$minprob,
+                      maxdepth = param$maxdepth))
   if(!is.null(wts))
     theDots$weights <- wts
   modelArgs <- c(list(formula = as.formula(".outcome ~ ."),
@@ -56,7 +61,8 @@ data(Sonar)
 set.seed(998)
 
 grid <- expand.grid(alpha = c(0.0001, 0.001,0.01,0.05),
-            minprob = c(0.001, 0.01,0.03))
+            minprob = c(0.001, 0.01,0.10),
+            maxdepth = c(3, 10, 50, Inf))
 
 inTraining <- createDataPartition(Sonar$Class, p = 0.75, list = FALSE)
 training <- Sonar[inTraining, ]
@@ -74,7 +80,8 @@ set.seed(123)
 mod <- train(Class ~ .,
                        data = training,
                        method = ctreePartykit,
-                       trControl = fitControl)
+                       trControl = fitControl,
+                       tuneGrid = grid)
 set.seed(123)
 test <- train(Class ~ .,
              data = training,
