@@ -5,16 +5,17 @@ ctreePartykit <- list(type = c("Classification", "Regression"),
                       library  = "partykit",
                       loop = NULL)
 
-ctreePartykit$parameters <- data.frame(parameter = c("alpha"),
-                                       class = c("numeric"),
-                                       label = c("1 - P-Value Threshold"))
+ctreePartykit$parameters <- data.frame(parameter = c("alpha","minprob"),
+                                       class = c("numeric","numeric"),
+                                       label = c("1 - P-Value Threshold", "min proportion in terminal node"))
 
 ctreePartykit$grid <- function(x, y, len = NULL, search = "grid") {
   if(search == "grid") {
-    out <- data.frame(alpha = seq(from = 0.99, to = 0.01, length = len))
+    out <- data.frame(alpha = seq(from = 0.99, to = 0.01, length = len),
+                      minprob = 0.01)
   } else {
-    out <- data.frame(alpha = runif, min = 0,
-                      max = 1)
+    out <- data.frame(alpha = runif(len, min = 0, max = 1),
+                      minprob = runif(len, min = 0, max = 1))
   }
 }
 
@@ -23,7 +24,8 @@ ctreePartykit$fit <- function (x, y, wts, param, lev, last, classProbs, ...) {
   dat$.outcome <- y
   theDots <- list(...)
   ctl <- do.call(getFromNamespace("ctree_control", "partykit"),
-                 list(alpha = param$alpha))
+                 list(alpha = param$alpha,
+                      minprob = param$minprob))
   if(!is.null(wts))
     theDots$weights <- wts
   modelArgs <- c(list(formula = as.formula(".outcome ~ ."),
@@ -49,31 +51,34 @@ ctreePartykit$tags = NULL
 ctreePartykit$levels = function(x) levels(x$data[, 1])
 ctreePartykit$sort = function(x) x[order(-x$alpha), ]
 
-# library(mlbench)
-# data(Sonar)
-# set.seed(998)
-# 
-# inTraining <- createDataPartition(Sonar$Class, p = 0.75, list = FALSE)
-# training <- Sonar[inTraining, ]
-# testing <- Sonar[-inTraining, ]
-# 
-# fitControl <- trainControl(method = "repeatedcv",
-#                            number = 5,
-#                            repeats = 1,
-#                            classProbs = TRUE,
-#                            summaryFunction = mnLogLoss
-#                            )
-# #)
-# 
-# set.seed(123)
-# mod <- train(Class ~ .,
-#                        data = training,
-#                        method = ctreePartykit,
-#                        trControl = fitControl)
-# set.seed(123)
-# test <- train(Class ~ .,
-#              data = training,
-#              method = "ctree",
-#              trControl = fitControl)
-# mod
-# test
+library(mlbench)
+data(Sonar)
+set.seed(998)
+
+grid <- expand.grid(alpha = c(0.0001, 0.001,0.01,0.05),
+            minprob = c(0.001, 0.01,0.03))
+
+inTraining <- createDataPartition(Sonar$Class, p = 0.75, list = FALSE)
+training <- Sonar[inTraining, ]
+testing <- Sonar[-inTraining, ]
+
+fitControl <- trainControl(method = "repeatedcv",
+                           number = 5,
+                           repeats = 1,
+                           classProbs = TRUE,
+                           summaryFunction = mnLogLoss
+                           )
+#)
+
+set.seed(123)
+mod <- train(Class ~ .,
+                       data = training,
+                       method = ctreePartykit,
+                       trControl = fitControl)
+set.seed(123)
+test <- train(Class ~ .,
+             data = training,
+             method = "ctree",
+             trControl = fitControl)
+mod
+test
